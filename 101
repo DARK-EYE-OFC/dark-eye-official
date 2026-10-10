@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html><head><title>DARK-EYE Pair</title><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;font-family:monospace}
+body{background:#0a0a0a;color:#0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:15px}
+.panel{border:2px solid #0f0;border-radius:22px;padding:28px;width:100%;max-width:420px;box-shadow:0 0 35px rgba(0,255,0,.4);background:rgba(0,255,0,.04);text-align:center}
+h1{letter-spacing:4px;font-size:30px;margin:0;text-shadow:0 0 10px #0f0}
+.sub{opacity:.6;font-size:11px;margin:6px 0 22px;letter-spacing:2px}
+input{width:100%;padding:14px;border-radius:12px;border:1px solid #0f0;background:#000;color:#0f0;font-size:16px;margin:10px 0;outline:none}
+button{width:100%;padding:14px;border-radius:12px;background:#0f0;color:#000;border:none;font-weight:900;cursor:pointer;margin-top:10px;letter-spacing:1px}
+button.outline{background:#000;color:#0f0;border:1px solid #0f0}
+#codeBox{display:none;margin-top:18px;padding:16px;border:1px dashed #0f0;border-radius:14px;background:#000}
+#code{font-size:36px;letter-spacing:8px;font-weight:900}
+#sess{word-break:break-all;font-size:9px;background:#111;padding:12px;border-radius:10px;margin-top:12px;display:none;text-align:left;border:1px solid #0f033}
+.badge{display:inline-block;padding:4px 12px;border-radius:20px;background:#0f0;color:#000;font-size:10px;font-weight:800;margin-bottom:14px}
+.link{color:#0f0;font-size:11px;opacity:.5;margin-top:18px;display:block}
+</style>
+</head>
+<body>
+<div class="panel">
+<div class="badge">● LIVE - DARK-EYE-OFC</div>
+<h1>DARK-EYE</h1>
+<p class="sub">OFFICIAL PAIRING HUB</p>
+
+<button onclick="location.href='/qr'">SCAN QR CODE</button>
+
+<hr style="margin:22px 0;border:0;border-top:1px solid rgba(0,255,0,.15)">
+
+<p style="font-size:12px;text-align:left;opacity:.8">PAIR CODE:</p>
+<input id="num" placeholder="26378xxxxxxx" type="number">
+<button onclick="getPair()">GET 8-DIGIT CODE</button>
+
+<div id="codeBox">
+<div id="code"></div>
+<p id="msg" style="font-size:11px;margin-top:10px;opacity:.8"></p>
+<div id="sess"></div>
+<button id="copyBtn" style="display:none;margin-top:10px" onclick="copySess()">COPY SESSION</button>
+</div>
+
+<div style="margin-top:20px;display:flex;gap:8px">
+<button class="outline" onclick="location.href='/sessions'">SESSION</button>
+<button class="outline" onclick="location.href='/qr'">QR PAGE</button>
+</div>
+
+<a class="link" href="https://github.com/DARK-EYE-OFC/dark-eye-official/blob/main/101" target="_blank">Source: /101</a>
+<p style="font-size:9px;opacity:.3;margin-top:10px">Used by AWESOME-MD, SKYPER-MD & All Bots via connection/sessions.js</p>
+</div>
+
+<script>
+let lastSessionVal='';
+async function getPair(){
+ const n=document.getElementById('num').value.trim(); if(!n)return alert('Enter number');
+ const box=document.getElementById('codeBox'); box.style.display='block';
+ document.getElementById('code').innerText='...'; document.getElementById('msg').innerText='Generating... please wait 10s';
+ try{
+  const r=await fetch('/pair?number='+n); const d=await r.json();
+  if(d.code){document.getElementById('code').innerText=d.code; document.getElementById('msg').innerText='WhatsApp > Linked Devices > Link with phone number > Enter: '+d.code+' | Waiting for login...';
+   const check=setInterval(async()=>{
+    const s=await fetch('/sessions'); const j=await s.json();
+    if(j.session){
+     lastSessionVal=j.session;
+     document.getElementById('sess').style.display='block';
+     document.getElementById('sess').innerText=j.session;
+     document.getElementById('copyBtn').style.display='block';
+     document.getElementById('msg').innerText='✓ Connected! Copy session below';
+     clearInterval(check);
+    }
+   },3000);
+  }else{document.getElementById('code').innerText='ERROR'; document.getElementById('msg').innerText=d.error||'Failed'}
+ }catch(e){document.getElementById('msg').innerText='Server error'}
+}
+function copySess(){ navigator.clipboard.writeText(lastSessionVal); alert('Session copied!'); }
+</script>
+</body></html>
