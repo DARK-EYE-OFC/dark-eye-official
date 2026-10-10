@@ -1,5 +1,1 @@
-node_modules
-auth_info_baileys
-temp_*
-.env
-
+auth_info_baileys\ntemp_*\nnode_modules
