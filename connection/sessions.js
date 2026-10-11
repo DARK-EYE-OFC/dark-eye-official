@@ -1,45 +1,78 @@
 const fs = require('fs');
 const path = require('path');
 
-function ensureDir(dir){ if(!fs.existsSync(dir)) fs.mkdirSync(dir,{recursive:true}); }
+const PREFIX = 'dark-eye-official:~';
+const CREDS_DIR = './auth_info_baileys';
 
-function saveSessionFromBase64(sessionStr, targetDir='./auth_info_baileys'){
-  ensureDir(targetDir);
-  try{
-    let data = sessionStr.trim();
-    if(data.includes('~')) data = data.split('~')[1];
-    if(data.includes('#')) data = data.split('#')[1];
-    const buff = Buffer.from(data,'base64');
-    let json = JSON.parse(buff.toString('utf8'));
-    if(json.creds) json = json.creds;
-    fs.writeFileSync(path.join(targetDir,'creds.json'), JSON.stringify(json,null,2));
-    console.log('[SESSION] Restored to', targetDir);
-    return true;
-  }catch(e){ console.error('[SESSION] Restore failed:',e.message); return false; }
-}
+// ========== CORE FUNCTIONS ==========
 
-function saveSessionFromCredsJson(credsJson, targetDir='./auth_info_baileys'){
-  ensureDir(targetDir);
-  try{
-    const creds = typeof credsJson==='string'? JSON.parse(credsJson) : credsJson;
-    fs.writeFileSync(path.join(targetDir,'creds.json'), JSON.stringify(creds,null,2));
-    return true;
-  }catch(e){ console.error(e.message); return false; }
+/**
+ * SPACE-MD => dark-eye-official => index.js => 101 => pair.js => sessions.js
+ * All sessions are prefixed with dark-eye-official:~
+ */
+
+function encodeSession(credsJson) {
+  // credsJson is stringified JSON from creds.json
+  const b64 = Buffer.from(credsJson).toString('base64');
+  return `${PREFIX}${b64}`;
 }
 
-function generateSessionString(targetDir='./auth_info_baileys'){
-  try{
-    const p = path.join(targetDir,'creds.json');
-    if(!fs.existsSync(p)) return null;
-    const creds = fs.readFileSync(p,'utf8');
-    return 'DARK-EYE~' + Buffer.from(creds).toString('base64');
-  }catch{ return null; }
+function decodeSession(sessionString) {
+  if (!sessionString) throw new Error('No session string');
+  if (!sessionString.startsWith(PREFIX)) {
+    throw new Error(`Invalid prefix! Must start with ${PREFIX}. Got: ${sessionString.slice(0,30)}`);
+  }
+  const b64 = sessionString.replace(PREFIX, '').trim();
+  const json = Buffer.from(b64, 'base64').toString('utf-8');
+  try {
+    JSON.parse(json); // validate JSON
+    return json;
+  } catch {
+    throw new Error('Invalid base64 session data');
+  }
 }
 
-function loadSessionDir(targetDir='./auth_info_baileys'){
-  return fs.existsSync(path.join(targetDir,'creds.json'));
+function saveSessionFromBase64(sessionString, customDir = CREDS_DIR) {
+  console.log(`[sessions.js] Decoding ${PREFIX} session...`);
+  const credsJson = decodeSession(sessionString);
+  
+  if (!fs.existsSync(customDir)) {
+    fs.mkdirSync(customDir, { recursive: true });
+  }
+  
+  const credsPath = path.join(customDir, 'creds.json');
+  fs.writeFileSync(credsPath, credsJson);
+  console.log(`[sessions.js] Session saved to ${credsPath}`);
+  return credsPath;
 }
-function clearSession(targetDir='./auth_info_baileys'){
-  if(fs.existsSync(targetDir)) fs.rmSync(targetDir,{recursive:true,force:true});
+
+function getSessionFromDir(dir = CREDS_DIR) {
+  const credsPath = path.join(dir, 'creds.json');
+  if (!fs.existsSync(credsPath)) return null;
+  
+  const credsJson = fs.readFileSync(credsPath, 'utf8');
+  return encodeSession(credsJson);
 }
-module.exports = { saveSessionFromBase64, saveSessionFromCredsJson, generateSessionString, loadSessionDir, clearSession, ensureDir };
+
+function saveSessionFromCredsFile(credsPath) {
+  if (!fs.existsSync(credsPath)) return null;
+  const credsJson = fs.readFileSync(credsPath, 'utf8');
+  const session = encodeSession(credsJson);
+  console.log(`[sessions.js] Generated session: ${session.slice(0, 50)}...`);
+  return session;
+}
+
+// For index.js live capture
+function isValidSession(sessionString) {
+  return sessionString && sessionString.startsWith(PREFIX);
+}
+
+module.exports = {
+  PREFIX,
+  encodeSession,
+  decodeSession,
+  saveSessionFromBase64,
+  getSessionFromDir,
+  saveSessionFromCredsFile,
+  isValidSession
+};

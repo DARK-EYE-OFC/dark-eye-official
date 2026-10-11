@@ -1,43 +1,45 @@
-const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore, Browsers } = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const QRCode = require('qrcode');
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const fs = require('fs');
-let currentQR = null;
-let qrSock = null;
+const qrcode = require('qrcode');
+const { saveSessionFromCredsFile, PREFIX } = require('./sessions');
 
-async function startQRGeneration(onQR, onConnect) {
-  const dir = './qr_auth';
-  if (fs.existsSync(dir)) fs.rmSync(dir,{recursive:true,force:true});
-  fs.mkdirSync(dir,{recursive:true});
+let currentQR = null;
+
+async function startQRGeneration(log, onConnect) {
+  const dir = './temp/qr_' + Date.now();
   const { state, saveCreds } = await useMultiFileAuthState(dir);
-  qrSock = makeWASocket({
-    logger: pino({level:'silent'}),
-    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({level:'silent'})) },
+  
+  const sock = makeWASocket({
+    auth: state,
     printQRInTerminal: false,
-    browser: Browsers.macOS('Chrome')
+    browser: ['SPACE-MD-QR', 'Chrome', '1.0']
   });
-  qrSock.ev.on('creds.update', saveCreds);
-  qrSock.ev.on('connection.update', async (u) => {
-    if (u.qr) {
-      currentQR = await QRCode.toDataURL(u.qr);
-      if (onQR) onQR(currentQR);
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    const { qr, connection } = update;
+    if (qr) {
+      currentQR = await qrcode.toDataURL(qr);
+      log('[qr.js] QR Generated');
     }
-    if (u.connection === 'open') {
+    if (connection === 'open') {
+      const credsPath = dir + '/creds.json';
+      if (fs.existsSync(credsPath)) {
+        const creds = fs.readFileSync(credsPath, 'utf8');
+        const session = saveSessionFromCredsFile(credsPath);
+        log(`[qr.js] Session: ${session.slice(0,60)}...`);
+        if (onConnect) onConnect(creds, session);
+      }
       currentQR = null;
-      let creds = null;
-      const p = dir + '/creds.json';
-      if (fs.existsSync(p)) creds = fs.readFileSync(p,'utf8');
-      if (onConnect) onConnect(creds);
-      setTimeout(()=>{ try{ fs.rmSync(dir,{recursive:true,force:true}); qrSock.end(); }catch{} },2000);
     }
-    if (u.connection === 'close') currentQR = null;
   });
-  return qrSock;
+
+  return sock;
 }
-function getCurrentQR(){ return currentQR; }
-function stopQR(){
-  currentQR = null;
-  if(qrSock){ try{ qrSock.end(); }catch{} qrSock=null; }
-  const dir='./qr_auth'; if(fs.existsSync(dir)) fs.rmSync(dir,{recursive:true,force:true});
+
+function getCurrentQR() {
+  return currentQR;
 }
-module.exports = { startQRGeneration, getCurrentQR, stopQR };
+
+module.exports = { startQRGeneration, getCurrentQR, PREFIX };
