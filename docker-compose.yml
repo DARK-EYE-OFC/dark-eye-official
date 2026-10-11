@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  dark-eye:
+    build:.
+    ports:
+      - "10000:10000"
+    restart: always
+    environment:
+      - PORT=10000
+      - NODE_ENV=production
+    volumes:
+      -./temp:/app/temp
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:10000/host"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
