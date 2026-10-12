@@ -115,22 +115,8 @@ async function createSessionViaPair(number, onCode, onSession, onStatus) {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // Register the connection listener BEFORE requesting the code.
-let pairingCodeRequested = false;
-
-sock.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
-  if (qr && !pairingCodeRequested && !sock.authState.creds.registered) {
-    pairingCodeRequested = true;
-
-    try {
-      const code = await sock.requestPairingCode(number);
-      console.log('[PAIR] WhatsApp pairing code received.');
-      if (onCode) onCode(code);
-    } catch (e) {
-      console.error('[PAIR] Code request failed:', e.message);
-      if (onStatus) onStatus('failed');
-    }
-  }
+    // Register the connection listener before requesting the code.
+sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
       if (connection === 'open') {
         console.log(`[PAIR] ${number} CONNECTED`);
 
@@ -196,6 +182,10 @@ sock.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
     await delay(2000);
 
     // This requests the code from Baileys; it does not fabricate one.
+    console.log('[PAIR] Requesting WhatsApp code...');
+    console.log('[PAIR] Socket user:', sock.user?.id || 'not assigned yet');
+    console.log('[PAIR] Registered:', sock.authState.creds.registered);
+
     const code = await sock.requestPairingCode(number);
 
     if (!code || typeof code !== 'string') {
@@ -208,7 +198,7 @@ sock.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
 
     return sock;
   } catch (e) {
-    console.error('[PAIR] Pairing request failed:', e.message);
+    console.error('[PAIR] Pairing request failed:', e.stack || e);
 
     if (onStatus) onStatus('failed');
 
