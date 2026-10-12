@@ -116,7 +116,21 @@ async function createSessionViaPair(number, onCode, onSession, onStatus) {
     sock.ev.on('creds.update', saveCreds);
 
     // Register the connection listener BEFORE requesting the code.
-    sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+let pairingCodeRequested = false;
+
+sock.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
+  if (qr && !pairingCodeRequested && !sock.authState.creds.registered) {
+    pairingCodeRequested = true;
+
+    try {
+      const code = await sock.requestPairingCode(number);
+      console.log('[PAIR] WhatsApp pairing code received.');
+      if (onCode) onCode(code);
+    } catch (e) {
+      console.error('[PAIR] Code request failed:', e.message);
+      if (onStatus) onStatus('failed');
+    }
+  }
       if (connection === 'open') {
         console.log(`[PAIR] ${number} CONNECTED`);
 
